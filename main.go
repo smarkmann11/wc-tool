@@ -2,66 +2,68 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"unicode/utf8"
 )
 
-func args() (string, string) {
-	args := os.Args[1:]
-	if len(args) == 0 {
-		fmt.Println("Provide a file_path")
-		os.Exit(1)
-	}
-
-	if len(args) == 1 {
-		return "d", args[0]
-	}
-
-	return args[0], args[1]
+type Counts struct {
+	Lines      int
+	Words      int
+	Bytes      int
+	Characters int
 }
 
-func readFile(file *os.File, mode string) int {
-	valueCount := 0
-
-	lines, words, bytes, characters := 0, 0, 0, 0
-
+func countFunction(file *os.File) Counts {
+	counts := Counts{}
 	scanner := bufio.NewScanner(file)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		switch mode {
-		case "d":
-			lines++
-			words += len(strings.Fields(line))
-			bytes += len(line) + 1
-			characters += utf8.RuneCountInString(line) + 1
-		case "-l":
-			valueCount++
-		case "-w":
-			words := strings.Fields(line)
-			valueCount += len(words)
-		case "-c":
-			valueCount += len(line) + 1
-		case "-m":
-			valueCount += utf8.RuneCountInString(line) + 1
-		}
+		counts.Lines++
+		counts.Words += len(strings.Fields(line))
+		counts.Bytes += len(line) + 1
+		counts.Characters += utf8.RuneCountInString(line) + 1
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Printf("Error reading File: %v\n", err)
+		log.Fatal(err)
 		os.Exit(1)
 	}
 
-	if mode == "d" {
-		fmt.Printf("Lines: %d, Words: %d, Bytes: %d, Characters: %d\n", lines, words, bytes, characters)
-		os.Exit(0)
-	}
-	return valueCount
+	return counts
 }
 
-func openFile(filepath string, mode string) int {
+func main() {
+
+	linesFlag := flag.Bool("l", false, "Show only lines of input")
+	wordsFlag := flag.Bool("w", false, "Show only words of input")
+	bytesFlag := flag.Bool("c", false, "Show only bytes of input")
+	charactersFlag := flag.Bool("m", false, "Show only characters of input")
+
+	var filepath string
+	var args []string
+
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-") {
+			args = append(args, arg)
+		} else {
+			filepath = arg
+		}
+	}
+
+	os.Args = append([]string{os.Args[0]}, args...)
+	flag.Parse()
+
+	if filepath == "" {
+		fmt.Printf("Option 1: go run main.go [flags] <files>\nOption 2: go run main.go <file> [flags]\nDefault: go run main.go <file>")
+		os.Exit(1)
+	}
+
 	file, err := os.Open(filepath)
 	if err != nil {
 		fmt.Println(err)
@@ -69,24 +71,24 @@ func openFile(filepath string, mode string) int {
 	}
 	defer file.Close()
 
-	return readFile(file, mode)
-}
+	counts := countFunction(file)
 
-func main() {
-
-	mode, filepath := args()
-	count := openFile(filepath, mode)
-
-	switch mode {
-	case "-l":
-		fmt.Printf("%d lines in file\n", count)
-	case "-w":
-		fmt.Printf("%d words in file\n", count)
-	case "-c":
-		fmt.Printf("%d bytes in file\n", count)
-	case "-m":
-		fmt.Printf("%d characters in file\n", count)
-	default:
-		fmt.Println("Unknown mode. Use -l, -w, or -c.")
+	if *linesFlag {
+		fmt.Printf("Lines: %d\n", counts.Lines)
+	}
+	if *wordsFlag {
+		fmt.Printf("Words: %d\n", counts.Words)
+	}
+	if *bytesFlag {
+		fmt.Printf("Bytes: %d\n", counts.Bytes)
+	}
+	if *charactersFlag {
+		fmt.Printf("Characters: %d\n", counts.Characters)
+	}
+	if !*linesFlag && !*wordsFlag && !*bytesFlag && !*charactersFlag {
+		fmt.Printf("Lines: %d\n", counts.Lines)
+		fmt.Printf("Words: %d\n", counts.Words)
+		fmt.Printf("Bytes: %d\n", counts.Bytes)
+		fmt.Printf("Characters: %d\n", counts.Characters)
 	}
 }
